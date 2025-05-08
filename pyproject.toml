@@ -23,8 +23,10 @@ keywords = [
 ]
 dependencies = [
     "matplotlib>=3.10.3",
-    # "pybasicbayes >= 0.2.1",
-    # "pyhsmm",
+    "pybasicbayes @ https://github.com/wingillis/pybasicbayes/raw/refs/heads/update-python/dist/pybasicbayes-0.3.0-cp311-cp311-linux_x86_64.whl ; python_version == '3.11' and sys_platform == 'linux'",
+    "pybasicbayes @ https://github.com/wingillis/pybasicbayes/raw/refs/heads/update-python/dist/pybasicbayes-0.3.0-cp312-cp312-linux_x86_64.whl ; python_version == '3.12' and sys_platform == 'linux'",
+    "pyhsmm @ https://github.com/wingillis/pyhsmm/raw/refs/heads/update-python/dist/pyhsmm-0.2.0-cp311-cp311-linux_x86_64.whl ; python_version == '3.11' and sys_platform == 'linux'",
+    "pyhsmm @ https://github.com/wingillis/pyhsmm/raw/refs/heads/update-python/dist/pyhsmm-0.2.0-cp312-cp312-linux_x86_64.whl ; python_version == '3.12' and sys_platform == 'linux'",
     "numpy>=2.2.5",
     "scipy>=1.15.3",
 ]
