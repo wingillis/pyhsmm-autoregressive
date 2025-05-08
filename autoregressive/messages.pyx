@@ -1,5 +1,5 @@
 # distutils: language = c++
-# distutils: extra_compile_args = -O2 -fopenmp -std=c++11 -DEIGEN_NO_MALLOC -DNDEBUG -w
+# distutils: extra_compile_args = -O3 -fopenmp -std=c++11 -DEIGEN_NO_MALLOC -DNDEBUG -w
 # distutils: extra_link_args = -fopenmp
 # cython: boundscheck = False
 

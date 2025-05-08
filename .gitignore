@@ -3,4 +3,8 @@
 *.pyc
 *.so
 *.cpp
-/build
+build/
+deps/
+
+.venv
+*.egg-info

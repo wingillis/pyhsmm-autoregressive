@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel", "Cython>=3", "numpy>=2.2.5", "requests"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "autoregressive"
+version = "0.2.0"
+description = "Extension for switching vector autoregressive models with pyhsmm"
+authors = [
+    {name = "Matthew James Johnson", email = "mattjj@csail.mit.edu"}
+]
+license-files = ["LICENSE-GPL"]
+readme = "README.md"
+requires-python = ">=3.11"
+classifiers = [
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python",
+    "Programming Language :: C++"
+]
+keywords = [
+    "bayesian", "inference", "mcmc", "time-series",
+    "autoregressive", "var", "svar"
+]
+dependencies = [
+    "matplotlib>=3.10.3",
+    # "pybasicbayes >= 0.2.1",
+    # "pyhsmm",
+    "numpy>=2.2.5",
+    "scipy>=1.15.3",
+]
+
+[project.urls]
+Homepage = "https://github.com/mattjj/pyhsmm-autoregressive"
+
+[project.optional-dependencies]
+dev = [
+    "build>=1.2.2.post1",
+]
+
+[tool.setuptools]
+packages = ["autoregressive"]
