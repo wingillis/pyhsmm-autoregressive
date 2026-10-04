@@ -1,47 +1,66 @@
+import numpy as np
 import setuptools
 from setuptools.extension import Extension
 from Cython.Build import cythonize
-import numpy as np
-import shutil
-import requests
-import tarfile
 from pathlib import Path
 
-def download_eigen():
-    eigenpath = Path('deps')
-    eigenpath.mkdir(parents=True, exist_ok=True)
-    eigenurl = 'https://gitlab.com/libeigen/eigen/-/archive/3.3.7/eigen-3.3.7.tar.gz'
-    eigentarpath = eigenpath / 'Eigen.tar.gz'
-    if not eigentarpath.exists():
-        print('Downloading Eigen...')
-        r = requests.get(eigenurl)
-        with open(eigentarpath, 'wb') as f:
-            f.write(r.content)
-    with tarfile.open(eigentarpath, 'r') as tar:
-        tar.extractall('deps')
-    if (eigenpath / "Eigen").exists():
-        shutil.rmtree(eigenpath / "Eigen")
-    shutil.move(eigenpath / 'eigen-3.3.7' / "Eigen", eigenpath / "Eigen")
-    print('...done!')
+# Eigen headers are vendored in deps/Eigen (see deps/README.mkd). If they
+# are missing, fall back to downloading the pinned 3.3.7 archive.
+EIGEN_VERSION = "3.3.7"
+EIGEN_SHA256 = "d56fbad95abf993f8af608484729e3d87ef611dd85b3380a8bad1d5cbc373a57"
+EIGEN_URL = f"https://gitlab.com/libeigen/eigen/-/archive/{EIGEN_VERSION}/eigen-{EIGEN_VERSION}.tar.gz"
 
-download_eigen()
+
+def ensure_eigen():
+    eigenpath = Path("deps") / "Eigen"
+    if eigenpath.exists():
+        return
+    import hashlib
+    import shutil
+    import tarfile
+    import urllib.request
+
+    deps = Path("deps")
+    deps.mkdir(parents=True, exist_ok=True)
+    eigentarpath = deps / "Eigen.tar.gz"
+    print(f"Eigen headers not found; downloading {EIGEN_URL} ...")
+    req = urllib.request.Request(EIGEN_URL, headers={"User-Agent": "autoregressive-build/1.0"})
+    data = urllib.request.urlopen(req, timeout=60).read()
+    digest = hashlib.sha256(data).hexdigest()
+    if digest != EIGEN_SHA256:
+        raise RuntimeError(
+            f"Eigen archive checksum mismatch: {digest} != {EIGEN_SHA256}"
+        )
+    eigentarpath.write_bytes(data)
+    with tarfile.open(eigentarpath, "r") as tar:
+        tar.extractall(deps)
+    shutil.move(deps / f"eigen-{EIGEN_VERSION}" / "Eigen", eigenpath)
+    print("...done!")
+
+
+ensure_eigen()
 
 extensions = []
 
 for file in Path("autoregressive").glob("**/*.pyx"):
     extensions.append(
         Extension(
-            str(str(file.with_suffix('')).replace("/", ".")),
-            [file],
-            include_dirs=[np.get_include(), 'deps'],
-            extra_compile_args=['-O3', '-w', '-std=c++11', '-DEIGEN_NO_MALLOC', '-DNDEBUG', '-fopenmp'],
-            extra_link_args=['-fopenmp'],
+            str(file.with_suffix("")).replace("/", "."),
+            sources=[file],
+            include_dirs=["deps", np.get_include()],
+            extra_compile_args=[
+                "-O3",
+                "-std=c++11",
+                "-DEIGEN_NO_MALLOC",
+                "-DNDEBUG",
+                "-w",
+                "-fopenmp",
+            ],
+            extra_link_args=["-fopenmp"],
         )
     )
 
-
 setuptools.setup(
-    name="autoregressive",
     ext_modules=cythonize(
         extensions,
         compiler_directives={

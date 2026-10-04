@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel", "Cython>=3", "numpy>=2.2.5", "requests"]
+requires = ["setuptools>=77.0", "wheel", "numpy>=2.2", "Cython>=3.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -9,35 +9,46 @@ description = "Extension for switching vector autoregressive models with pyhsmm"
 authors = [
     {name = "Matthew James Johnson", email = "mattjj@csail.mit.edu"}
 ]
-license-files = ["LICENSE-GPL"]
+license = "GPL-3.0-or-later"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 classifiers = [
     "Intended Audience :: Science/Research",
     "Programming Language :: Python",
-    "Programming Language :: C++"
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: C++",
 ]
 keywords = [
-    "bayesian", "inference", "mcmc", "time-series",
-    "autoregressive", "var", "svar"
+    "bayesian",
+    "inference",
+    "mcmc",
+    "time-series",
+    "autoregressive",
+    "var",
+    "svar",
 ]
 dependencies = [
-    "matplotlib>=3.10.3",
-    "pybasicbayes @ https://github.com/wingillis/pybasicbayes/raw/refs/heads/update-python/dist/pybasicbayes-0.3.0-cp311-cp311-linux_x86_64.whl ; python_version == '3.11' and sys_platform == 'linux'",
-    "pybasicbayes @ https://github.com/wingillis/pybasicbayes/raw/refs/heads/update-python/dist/pybasicbayes-0.3.0-cp312-cp312-linux_x86_64.whl ; python_version == '3.12' and sys_platform == 'linux'",
-    "pyhsmm @ https://github.com/wingillis/pyhsmm/raw/refs/heads/update-python/dist/pyhsmm-0.2.0-cp311-cp311-linux_x86_64.whl ; python_version == '3.11' and sys_platform == 'linux'",
-    "pyhsmm @ https://github.com/wingillis/pyhsmm/raw/refs/heads/update-python/dist/pyhsmm-0.2.0-cp312-cp312-linux_x86_64.whl ; python_version == '3.12' and sys_platform == 'linux'",
-    "numpy>=2.2.5",
-    "scipy>=1.15.3",
+    "matplotlib>=3.10",
+    "numpy>=2.2",
+    "pybasicbayes",
+    "pyhsmm",
+    "scipy>=1.15",
 ]
 
 [project.urls]
 Homepage = "https://github.com/mattjj/pyhsmm-autoregressive"
+Repository = "https://github.com/mattjj/pyhsmm-autoregressive.git"
 
 [project.optional-dependencies]
 dev = [
-    "build>=1.2.2.post1",
+    "build>=1.2.2",
+    "pytest>=8.0",
 ]
 
 [tool.setuptools]
 packages = ["autoregressive"]
+
+[tool.setuptools.package-data]
+autoregressive = ["*.h", "*.pyx"]

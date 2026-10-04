@@ -7,4 +7,9 @@ build/
 deps/
 
 .venv
-*.egg-info
+*.egg-infobuild/
+dist/
+*.egg-info/
+uv.lock
+deps/Eigen.tar.gz
+deps/eigen-*/
