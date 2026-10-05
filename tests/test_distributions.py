@@ -5,8 +5,8 @@ from matplotlib import pyplot as plt
 from nose.plugins.attrib import attr
 from pybasicbayes.testing.mixins import BigDataGibbsTester
 
-from .. import distributions as d
-from ..util import AR_striding
+from autoregressive import distributions as d
+from autoregressive.util import AR_striding
 
 # TODO merge nlags, prefixes into the hyperparameter settings
 # TODO params_close should depend on setting_idx
