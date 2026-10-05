@@ -1,10 +1,9 @@
-from __future__ import division
 import numpy as np
 import abc
 from matplotlib import pyplot as plt
 
 from nose.plugins.attrib import attr
-from pyhsmm.basic.pybasicbayes.testing.mixins import BigDataGibbsTester
+from pybasicbayes.testing.mixins import BigDataGibbsTester
 
 from .. import distributions as d
 from ..util import AR_striding
