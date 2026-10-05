@@ -45,10 +45,10 @@ class ARBigDataGibbsTester(BigDataGibbsTester):
         d2 = self.distribution_class(**hypparam_dict)
 
         nlags = d1.nlags
-        data = [np.zeros((nlags, d1.D_out))]
+        rows = [np.zeros(d1.D_out) for _ in range(nlags)]
         for _ in range(self.big_data_size):
-            data.append(d1.rvs(np.asarray(data[-nlags:])))
-        data = np.concatenate(data, axis=0)
+            rows.append(d1.rvs(np.asarray(rows[-nlags:]))[0])
+        data = np.asarray(rows)
         d2.resample(AR_striding(data, nlags))
 
         assert self.params_close(d1, d2)
