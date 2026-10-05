@@ -102,9 +102,16 @@ def resample_arhmm(
                         &stats[2*i,0,0,0],&ns[2*i,0],&transcounts[2*i,0,0],
                         stateseqs_v[i], randseqs_v[i],alphans_v[i])
 
+    # build (K, 4) object arrays of the sufficient statistics; numpy >= 1.24
+    # no longer auto-converts ragged python lists during arithmetic, so the
+    # rows must be real object arrays for the downstream natural-parameter
+    # updates
     allstats = []
     for statmat, n in zip(np.sum(stats,0),np.sum(ns,0)):
         xxT, yxT, yyT = statmat[:-D,:-D], statmat[-D:,:-D], statmat[-D:,-D:]
-        allstats.append([yyT,yxT,xxT,n])
+        row = np.empty(4, dtype=object)
+        row[0], row[1], row[2], row[3] = yyT, yxT, xxT, n
+        allstats.append(row)
+    allstats = np.array(allstats)
 
     return allstats, np.sum(transcounts,axis=0), np.asarray(likes)
