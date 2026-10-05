@@ -1,53 +1,73 @@
-from distutils.core import setup
-from Cython.Build import cythonize
 import numpy as np
-from os.path import join, exists
-from os import mkdir
-from shutil import move
-import tarfile
-from urllib.request import Request, urlopen
-from glob import glob
+import setuptools
+from setuptools.extension import Extension
+from Cython.Build import cythonize
+from pathlib import Path
 
-# make dependency directory
-if not exists('deps'):
-    mkdir('deps')
+# Eigen headers are vendored in deps/Eigen (see deps/README.mkd). If they
+# are missing, fall back to downloading the pinned 3.3.7 archive.
+EIGEN_VERSION = "3.3.7"
+EIGEN_SHA256 = "d56fbad95abf993f8af608484729e3d87ef611dd85b3380a8bad1d5cbc373a57"
+EIGEN_URL = f"https://gitlab.com/libeigen/eigen/-/archive/{EIGEN_VERSION}/eigen-{EIGEN_VERSION}.tar.gz"
 
-# download Eigen if we don't have it in deps
-eigenurl = 'https://gitlab.com/libeigen/eigen/-/archive/3.3.7/eigen-3.3.7.tar.gz'
-eigentarpath = join('deps', 'Eigen.tar.gz')
-eigenpath = join('deps', 'Eigen')
-if not exists(eigenpath):
-    print('Downloading Eigen...')
-    req = Request(eigenurl, headers={'User-Agent': 'XYZ/3.0'})
-    tar_data = webpage = urlopen(req, timeout=10).read()
-    with open(eigentarpath, 'wb') as f:
-        f.write(tar_data)
 
-    with tarfile.open(eigentarpath, 'r') as tar:
-        tar.extractall('deps')
-    thedir = glob(join('deps', 'eigen-*'))[0]
-    move(join(thedir, 'Eigen'), eigenpath)
-    print('...done!')
+def ensure_eigen():
+    eigenpath = Path("deps") / "Eigen"
+    if eigenpath.exists():
+        return
+    import hashlib
+    import shutil
+    import tarfile
+    import urllib.request
 
-setup(
-    name='autoregressive',
-    version='0.1.2',
-    description='Extension for switching vector autoregressive models with pyhsmm',
-    author='Matthew James Johnson',
-    author_email='mattjj@csail.mit.edu',
-    url='https://github.com/mattjj/pyhsmm-autoregressive',
-    license='GPL',
-    packages=['autoregressive'],
-    keywords=[
-        'bayesian', 'inference', 'mcmc', 'time-series',
-        'autoregressive', 'var', 'svar'],
-    install_requires=[
-        'Cython >= 0.20.1',
-        'numpy', 'scipy', 'matplotlib', 'pybasicbayes >= 0.2.1', 'pyhsmm'],
-    classifiers=[
-        'Intended Audience :: Science/Research',
-        'Programming Language :: Python',
-        'Programming Language :: C++'],
-    ext_modules=cythonize('**/*.pyx'),
-    include_dirs=[np.get_include(), 'deps']
+    deps = Path("deps")
+    deps.mkdir(parents=True, exist_ok=True)
+    eigentarpath = deps / "Eigen.tar.gz"
+    print(f"Eigen headers not found; downloading {EIGEN_URL} ...")
+    req = urllib.request.Request(EIGEN_URL, headers={"User-Agent": "autoregressive-build/1.0"})
+    data = urllib.request.urlopen(req, timeout=60).read()
+    digest = hashlib.sha256(data).hexdigest()
+    if digest != EIGEN_SHA256:
+        raise RuntimeError(
+            f"Eigen archive checksum mismatch: {digest} != {EIGEN_SHA256}"
+        )
+    eigentarpath.write_bytes(data)
+    with tarfile.open(eigentarpath, "r") as tar:
+        tar.extractall(deps)
+    shutil.move(deps / f"eigen-{EIGEN_VERSION}" / "Eigen", eigenpath)
+    print("...done!")
+
+
+ensure_eigen()
+
+extensions = []
+
+for file in Path("autoregressive").glob("**/*.pyx"):
+    extensions.append(
+        Extension(
+            str(file.with_suffix("")).replace("/", "."),
+            sources=[file],
+            include_dirs=["deps", np.get_include()],
+            extra_compile_args=[
+                "-O2",
+                "-std=c++11",
+                "-DEIGEN_NO_MALLOC",
+                "-DNDEBUG",
+                "-w",
+                "-fopenmp",
+            ],
+            extra_link_args=["-fopenmp"],
+        )
+    )
+
+setuptools.setup(
+    ext_modules=cythonize(
+        extensions,
+        compiler_directives={
+            "language_level": 3,
+            "boundscheck": False,
+            "wraparound": False,
+            "cdivision": True,
+        },
+    ),
 )

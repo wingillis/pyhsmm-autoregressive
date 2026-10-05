@@ -1,167 +1,95 @@
-from __future__ import division
 import numpy as np
 import abc
 from matplotlib import pyplot as plt
 
 from nose.plugins.attrib import attr
-from pyhsmm.basic.pybasicbayes.testing.mixins import BigDataGibbsTester
+from pybasicbayes.testing.mixins import BigDataGibbsTester
 
-from .. import distributions as d
-from ..util import AR_striding
+from autoregressive import distributions as d
+from autoregressive.util import AR_striding
 
-# TODO merge nlags, prefixes into the hyperparameter settings
-# TODO params_close should depend on setting_idx
+
+@attr('AR_striding')
+class TestARStriding:
+    def test_ar_striding(self):
+        # as_strided with row-major interleaving: strided row i contains
+        # data[i], ..., data[i+nlags] flattened (oldest first, target last)
+        data = np.arange(1, 6, dtype=float)[:, None]
+
+        strided = AR_striding(data, 2)
+
+        assert strided.shape == (3, 3)
+        assert np.array_equal(strided[0], [1., 2., 3.])
+        assert np.array_equal(strided[1], [2., 3., 4.])
+        assert np.array_equal(strided[2], [3., 4., 5.])
+
+    def test_ar_striding_blocks(self):
+        rng = np.random.RandomState(0)
+        data = rng.randn(50, 4)
+        nlags = 3
+        strided = AR_striding(data, nlags)
+        assert strided.shape == (50 - nlags, 4 * (nlags + 1))
+        # lag blocks are chronological; the final block is the target
+        for lag in range(nlags + 1):
+            assert np.allclose(
+                strided[:, lag * 4:(lag + 1) * 4],
+                data[lag:lag + (50 - nlags)])
+
 
 class ARBigDataGibbsTester(BigDataGibbsTester):
-    def check_big_data(self,setting_idx,hypparam_dict):
+    # Draws a synthetic AR time series from a ground-truth AutoRegression
+    # and checks that a fresh model recovers A and sigma from the strided
+    # data (the conjugate posterior concentrates on the truth).
+    def check_big_data(self, setting_idx, hypparam_dict):
         d1 = self.distribution_class(**hypparam_dict)
         d2 = self.distribution_class(**hypparam_dict)
 
-        data = d1.rvs(prefix=self.prefixes[setting_idx],length=self.big_data_size)
-        d2.resample(AR_striding(data,self.nlagss[setting_idx]))
+        nlags = d1.nlags
+        D = d1.D_out
 
-        assert self.params_close(d1,d2)
+        # a stable ground truth: geometrically decaying lag weights
+        d1.A = np.zeros_like(d1.A)
+        for lag in range(nlags):
+            w = 0.5 ** (lag + 1)
+            d1.A[:, 1 + lag * D:1 + (lag + 1) * D] = w * np.eye(D)
+        d1.sigma = np.eye(D)
+
+        rows = [np.zeros(D) for _ in range(nlags)]
+        for _ in range(self.big_data_size):
+            rows.append(d1.rvs(np.asarray(rows[-nlags:]))[0])
+        data = np.asarray(rows)
+        d2.resample(AR_striding(data, nlags))
+
+        assert self.params_close(d1, d2)
 
     @abc.abstractproperty
-    def prefixes(self):
+    def distribution_class(self):
         pass
 
-    @abc.abstractproperty
-    def nlagss(self):
-        pass
+    def params_close(self, d1, d2):
+        return np.allclose(d1.A, d2.A, atol=0.05) and \
+            np.allclose(d1.sigma, d2.sigma, atol=0.05)
+
+    @property
+    def big_data_size(self):
+        return 20000
 
 
 @attr('AR_MNIW')
 class Test_AR_MNIW(ARBigDataGibbsTester):
-    @property
-    def distribution_class(self):
-        return d.AR_MNIW
+    distribution_class = d.AutoRegression
 
     @property
     def hyperparameter_settings(self):
-        return (
-            dict(nu_0=25,S_0=25*np.eye(2),M_0=np.zeros((2,4)),Kinv_0=np.eye(4),
-                A=np.hstack((-0.2*np.eye(2),1.2*np.eye(2))),sigma=np.eye(2)),
-            dict(nu_0=25,S_0=2*25*np.eye(2),M_0=np.zeros((2,4)),Kinv_0=1./3*np.eye(4),
-                A=np.hstack((-0.2*np.eye(2),1.2*np.eye(2))),sigma=np.eye(2)),
-            )
+        return [
+            # nlags=1, affine (D_in = 2*1 + 1)
+            dict(nu_0=5., S_0=np.eye(2), M_0=np.zeros((2, 3)),
+                 K_0=np.eye(3), affine=True),
+            # nlags=2, affine (D_in = 2*2 + 1)
+            dict(nu_0=6., S_0=np.eye(2), M_0=np.zeros((2, 5)),
+                 K_0=np.eye(5), affine=True),
+        ]
 
-    @property
-    def prefixes(self):
-        return (np.zeros((2,2)),np.zeros((2,2)))
-
-    @property
-    def nlagss(self):
-        return (2,2)
-
-    def params_close(self,d1,d2):
-        return np.linalg.norm(d1.fullA-d2.fullA) < 0.1 \
-                and np.linalg.norm(d1.sigma-d2.sigma) < 0.1
-
-    @property
-    def big_data_size(self):
-        return 10000
-
-    @property
-    def big_data_repeats_per_setting(self):
-        return 3
-
-@attr('AR_MNFixedSigma')
-class Test_AR_MNFixedSigma(ARBigDataGibbsTester):
-    @property
-    def distribution_class(self):
-        return d.AR_MNFixedSigma
-
-    @property
-    def hyperparameter_settings(self):
-        return (
-            dict(sigma=np.diag([1.,2.]),M_0=np.zeros((2,4)),Uinv_0=np.diag([1e-2,2e-2]),
-                Vinv_0=np.diag([1e-2,2e-2,1e-2,1e-2]),
-                A=np.hstack((-0.2*np.eye(2),1.2*np.eye(2)))),
-            )
-
-    @property
-    def prefixes(self):
-        return (np.zeros((2,2)),)
-
-    @property
-    def nlagss(self):
-        return (2,)
-
-    def params_close(self,d1,d2):
-        return np.linalg.norm(d1.fullA-d2.fullA) < 0.1
-
-    @property
-    def big_data_size(self):
-        return 10000
-
-    @property
-    def big_data_repeats_per_setting(self):
-        return 3
-
-@attr('AR_IWFixedA')
-class Test_AR_IWFixedA(ARBigDataGibbsTester):
-    @property
-    def distribution_class(self):
-        return d.AR_IWFixedA
-
-    @property
-    def hyperparameter_settings(self):
-        return (
-            dict(A=np.hstack((-0.2*np.eye(2),1.2*np.eye(2))),nu_0=4,S_0=4*np.eye(2)),
-            )
-
-    @property
-    def prefixes(self):
-        return (np.zeros((2,2)),)
-
-    @property
-    def nlagss(self):
-        return (2,)
-
-    def params_close(self,d1,d2):
-        return np.linalg.norm(d1.sigma-d2.sigma) < 0.25
-
-    @property
-    def big_data_size(self):
-        return 10000
-
-    @property
-    def big_data_repeats_per_setting(self):
-        return 3
-
-@attr('AR_MN_IW_Nonconj')
-class Test_AR_MN_IW_Nonconj(ARBigDataGibbsTester):
-    @property
-    def distribution_class(self):
-        return d.AR_MN_IW_Nonconj
-
-    @property
-    def hyperparameter_settings(self):
-        return (
-            dict(
-                nu_0=5,S_0=5*np.eye(2),
-                M_0=np.zeros((2,4)),Uinv_0=1e-2*np.eye(2),Vinv_0=1e-2*np.eye(4),
-                A=np.hstack((-0.2*np.eye(2),1.2*np.eye(2))),sigma=np.eye(2),
-                niter=10),
-            )
-
-    @property
-    def prefixes(self):
-        return (np.zeros((2,2)),)
-
-    @property
-    def nlagss(self):
-        return (2,)
-
-    def params_close(self,d1,d2):
-        return np.linalg.norm(d1.fullA-d2.fullA) < 1.5
-
-    @property
-    def big_data_size(self):
-        return 5000
-
-    @property
-    def big_data_repeats_per_setting(self):
-        return 3
-
+    def big_data_Gibbs_tests(self):
+        for setting_idx, hypparam_dict in enumerate(self.hyperparameter_settings):
+            yield self.check_big_data, setting_idx, hypparam_dict

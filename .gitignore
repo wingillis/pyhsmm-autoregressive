@@ -3,4 +3,13 @@
 *.pyc
 *.so
 *.cpp
-/build
+build/
+deps/
+
+.venv
+*.egg-infobuild/
+dist/
+*.egg-info/
+uv.lock
+deps/Eigen.tar.gz
+deps/eigen-*/
