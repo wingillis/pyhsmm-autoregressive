@@ -45,7 +45,16 @@ class ARBigDataGibbsTester(BigDataGibbsTester):
         d2 = self.distribution_class(**hypparam_dict)
 
         nlags = d1.nlags
-        rows = [np.zeros(d1.D_out) for _ in range(nlags)]
+        D = d1.D_out
+
+        # a stable ground truth: geometrically decaying lag weights
+        d1.A = np.zeros_like(d1.A)
+        for lag in range(nlags):
+            w = 0.5 ** (lag + 1)
+            d1.A[:, 1 + lag * D:1 + (lag + 1) * D] = w * np.eye(D)
+        d1.sigma = np.eye(D)
+
+        rows = [np.zeros(D) for _ in range(nlags)]
         for _ in range(self.big_data_size):
             rows.append(d1.rvs(np.asarray(rows[-nlags:]))[0])
         data = np.asarray(rows)
