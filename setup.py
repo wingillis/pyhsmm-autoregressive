@@ -49,7 +49,7 @@ for file in Path("autoregressive").glob("**/*.pyx"):
             sources=[file],
             include_dirs=["deps", np.get_include()],
             extra_compile_args=[
-                "-O3",
+                "-O2",
                 "-std=c++11",
                 "-DEIGEN_NO_MALLOC",
                 "-DNDEBUG",
