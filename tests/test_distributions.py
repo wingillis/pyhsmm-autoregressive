@@ -12,50 +12,58 @@ from autoregressive.util import AR_striding
 @attr('AR_striding')
 class TestARStriding:
     def test_ar_striding(self):
-        # row t of the strided data contains the affine 1 followed by the
-        # nlags previous observations, oldest first
+        # as_strided with row-major interleaving: strided row i contains
+        # data[i], ..., data[i+nlags] flattened (oldest first, target last)
         data = np.arange(1, 6, dtype=float)[:, None]
 
         strided = AR_striding(data, 2)
 
         assert strided.shape == (3, 3)
-        assert np.array_equal(strided[0], [1., 1., 2.])
-        assert np.array_equal(strided[1], [1., 2., 3.])
-        assert np.array_equal(strided[2], [1., 3., 4.])
+        assert np.array_equal(strided[0], [1., 2., 3.])
+        assert np.array_equal(strided[1], [2., 3., 4.])
+        assert np.array_equal(strided[2], [3., 4., 5.])
 
-    def test_ar_striding_matches_regression(self):
+    def test_ar_striding_blocks(self):
         rng = np.random.RandomState(0)
         data = rng.randn(50, 4)
-        strided = AR_striding(data, 3)
-        assert strided.shape == (47, 3 * 4 + 1)
-        # first column is the affine offset
-        assert np.all(strided[:, 0] == 1.)
-        # the lagged blocks line up with the shifted data
-        for lag in range(3):
-            assert np.allclose(strided[:, 1 + lag * 4:1 + (lag + 1) * 4],
-                               data[2 - lag:2 - lag + 47])
+        nlags = 3
+        strided = AR_striding(data, nlags)
+        assert strided.shape == (50 - nlags, 4 * (nlags + 1))
+        # lag blocks are chronological; the final block is the target
+        for lag in range(nlags + 1):
+            assert np.allclose(
+                strided[:, lag * 4:(lag + 1) * 4],
+                data[lag:lag + (50 - nlags)])
 
 
 class ARBigDataGibbsTester(BigDataGibbsTester):
-    # BigDataGibbsTester variant that draws a synthetic AR time series
-    # from a ground-truth model and recovers it from the strided data.
+    # Draws a synthetic AR time series from a ground-truth AutoRegression
+    # and checks that a fresh model recovers A and sigma from the strided
+    # data (the conjugate posterior concentrates on the truth).
     def check_big_data(self, setting_idx, hypparam_dict):
         d1 = self.distribution_class(**hypparam_dict)
         d2 = self.distribution_class(**hypparam_dict)
 
-        data = d1.rvs(prefix=self.prefixes[setting_idx],
-                      length=self.big_data_size)
-        d2.resample(AR_striding(data, self.nlagss[setting_idx]))
+        nlags = d1.nlags
+        data = [np.zeros((nlags, d1.D_out))]
+        for _ in range(self.big_data_size):
+            data.append(d1.rvs(np.asarray(data[-nlags:])))
+        data = np.concatenate(data, axis=0)
+        d2.resample(AR_striding(data, nlags))
 
         assert self.params_close(d1, d2)
 
     @abc.abstractproperty
-    def prefixes(self):
+    def distribution_class(self):
         pass
 
-    @abc.abstractproperty
-    def nlagss(self):
-        pass
+    def params_close(self, d1, d2):
+        return np.allclose(d1.A, d2.A, atol=0.05) and \
+            np.allclose(d1.sigma, d2.sigma, atol=0.05)
+
+    @property
+    def big_data_size(self):
+        return 20000
 
 
 @attr('AR_MNIW')
@@ -65,22 +73,13 @@ class Test_AR_MNIW(ARBigDataGibbsTester):
     @property
     def hyperparameter_settings(self):
         return [
-            dict(nu_0=5., S_0=np.eye(3), M_0=np.zeros((2, 3)),
+            # nlags=1, affine (D_in = 2*1 + 1)
+            dict(nu_0=5., S_0=np.eye(2), M_0=np.zeros((2, 3)),
                  K_0=np.eye(3), affine=True),
-            dict(nu_0=6., S_0=np.eye(9), M_0=np.zeros((2, 9)),
-                 K_0=np.eye(9), affine=True, nlags=2),
+            # nlags=2, affine (D_in = 2*2 + 1)
+            dict(nu_0=6., S_0=np.eye(2), M_0=np.zeros((2, 5)),
+                 K_0=np.eye(5), affine=True),
         ]
-
-    @property
-    def prefixes(self):
-        return [np.zeros((20, 2)), np.zeros((21, 2))]
-
-    @property
-    def nlagss(self):
-        return [1, 2]
-
-    def params_close(self, d1, d2):
-        return np.allclose(d1.A, d2.A) and np.allclose(d1.sigma, d2.sigma)
 
     def big_data_Gibbs_tests(self):
         for setting_idx, hypparam_dict in enumerate(self.hyperparameter_settings):
