@@ -10,3 +10,16 @@ Make sure `libomp` is installed when compiling on linux.
 ```bash
 sudo apt install libomp-dev
 ```
+
+## Legacy Python 3.7 support
+
+This version requires Python >= 3.12. The final Python 3.7-compatible state
+of this repository is preserved on the `py37-legacy` branch (and the
+`py37-final` tag):
+
+```bash
+pip install "git+https://github.com/wingillis/pyhsmm-autoregressive.git@py37-legacy"
+```
+
+The legacy branch is frozen (no new features); the modern branch is the
+supported going forward.
